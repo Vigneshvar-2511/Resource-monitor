@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import tkinter as tk
 from tkinter import ttk
+import tkinter.font
 
 def get_size(bytes):
     if bytes is None:
@@ -30,7 +31,7 @@ def get_processes_info():
             except psutil.AccessDenied:
                 cores = 0
             try:
-                cpu_usage = sum(process.cpu_times())
+                cpu_usage = process.cpu_percent()
             except psutil.AccessDenied:
                 cpu_usage = 0
             status = process.status()
@@ -39,7 +40,8 @@ def get_processes_info():
             except psutil.AccessDenied:
                 nice = 0
             try:
-                memory_usage = process.memory_full_info().uss
+                memory_info = process.memory_info()
+                memory_usage = memory_info.rss
             except psutil.AccessDenied:
                 memory_usage = 0
             io_counters = process.io_counters()
@@ -60,6 +62,8 @@ def get_processes_info():
 
     return processes
 
+
+
 def construct_dataframe(processes):
     df = pd.DataFrame(processes)
     df.set_index('pid', inplace=True)
@@ -77,8 +81,20 @@ def construct_dataframe(processes):
 def update_info():
     processes = get_processes_info()
     df = construct_dataframe(processes)
+    total_memory = psutil.virtual_memory().percent
+    total_cpu = psutil.cpu_percent()
+    
     text.delete(1.0, tk.END)
-    text.insert(tk.END, df.to_string())
+    text.insert(tk.END, f"Total Memory Usage: {total_memory:.2f}%\n")
+    text.insert(tk.END, f"Total CPU Usage: {total_cpu:.2f}%\n\n")
+    
+    text.insert(tk.END, "Top 10 Processes by Memory Usage:\n")
+    top_processes = df.head(10)
+    text.insert(tk.END, top_processes.to_string())
+    
+    text.insert(tk.END, "\nCurrently Running Processes:\n")
+    current_processes = df[~df.index.isin(top_processes.index)]
+    text.insert(tk.END, current_processes.to_string())
 
 def on_refresh_button_click():
     update_info()
